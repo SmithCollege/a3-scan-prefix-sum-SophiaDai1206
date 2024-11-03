@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
+
 double get_clock() {
     struct timeval tv;
     int ok = gettimeofday(&tv, NULL);
@@ -12,8 +13,8 @@ double get_clock() {
     return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
 }
 
-#define SIZE 128
-#define N 1000000
+#define SIZE 16
+
 int main() {
     // Allocate memory
     int* input = malloc(sizeof(int) * SIZE);
@@ -23,21 +24,9 @@ int main() {
     for (int i = 0; i < SIZE; i++) {
         input[i] = 1;  
     }
-    
-    double times[N];
-    double t0 = get_clock();  // Start time before the loop
 
-    for (int i = 0; i < N; i++) {
-        times[i] = get_clock();
-    }
-
-    double t1 = get_clock();  // End time after the loop
-
-    // Calculate the time per call to get_clock() in nanoseconds
-    printf("Time per call to get_clock(): %f ns\n", (1000000000.0 * (t1 - t0) / N));
-
-   
     double t_start = get_clock(); 
+    printf("%f",t_start);
 
 
     for (int i = 0; i < SIZE; i++) {

@@ -1,54 +1,64 @@
+#include <cuda_runtime.h>
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
+#include <chrono>  
 
+__global__ void recursiveDoublingPrefixSum(int* input, int* output, int n) {
+    extern __shared__ int temp[];  
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-double get_clock() {
-    struct timeval tv;
-    int ok = gettimeofday(&tv, NULL);
-    if (ok < 0) {
-        printf("gettimeofday error\n");
-        return -1.0; 
+    temp[threadIdx.x] = input[tid];
+
+    __syncthreads();
+    
+    for (int offset = 1; offset < blockDim.x; offset *= 2) {
+        int tempVal = 0;
+        if (threadIdx.x >= offset) {
+            tempVal = temp[threadIdx.x - offset];
+        }
+        __syncthreads();
+        temp[threadIdx.x] += tempVal;
+        __syncthreads();
     }
-    return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
+
+    // Store the result
+    output[tid] = temp[threadIdx.x];
 }
 
-#define SIZE 16
-
 int main() {
-    // Allocate memory
-    int* input = malloc(sizeof(int) * SIZE);
-    int* output = malloc(sizeof(int) * SIZE);
-
-    // Initialize input array
-    for (int i = 0; i < SIZE; i++) {
-        input[i] = 1;  
-    }
-
-    double t_start = get_clock(); 
-    printf("%f",t_start);
-
+    int SIZE = 10240;  // Example size
+    int* h_input = (int*)malloc(sizeof(int) * SIZE);
+    int* h_output = (int*)malloc(sizeof(int) * SIZE);
+    int* d_input;
+    int* d_output;
 
     for (int i = 0; i < SIZE; i++) {
-        int value = 0;
-        for (int j = 0; j <= i; j++) {
-            value += input[j];
-        }
-        output[i] = value;
+        h_input[i] = 1;  
     }
-    double t_end = get_clock();
+   
 
-    // Check and print results
-    for (int i = 0; i < SIZE; i++) {
-        printf("%d ", output[i]);
-    }
-    printf("\n");
-    double time_taken = (t_end - t_start) ;
-    printf("Time taken for prefix sum: %f seconds\n", time_taken);
+    cudaMalloc((void**)&d_input, SIZE * sizeof(int));
+    cudaMalloc((void**)&d_output, SIZE * sizeof(int));
+    cudaMemcpy(d_input, h_input, SIZE * sizeof(int), cudaMemcpyHostToDevice);
+    auto start = std::chrono::high_resolution_clock::now();
+    recursiveDoublingPrefixSum<<<1, SIZE, SIZE * sizeof(int)>>>(d_input, d_output, SIZE);
+   
+    auto end = std::chrono::high_resolution_clock::now();
+    cudaMemcpy(h_output, d_output, SIZE * sizeof(int), cudaMemcpyDeviceToHost);
+    printf("%s\n", cudaGetErrorString(cudaGetLastError()));
 
-    // Free allocated memory
-    free(input);
-    free(output);
+    
+    
+    std::chrono::duration<double> elapsed = end - start;
 
+    // printf("Prefix Sum Output:\n");
+    // for (int i = 0; i < SIZE; i++) {
+    //     printf("%d ", h_output[i]);
+    // }
+    // printf("\n");
+    std::cout << "Time taken for naive GPU prefix sum: " << elapsed.count() << " seconds" << std::endl;
+    cudaFree(d_input);
+    cudaFree(d_output);
     return 0;
 }
